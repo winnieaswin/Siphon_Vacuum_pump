@@ -1,0 +1,44 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            text-align: center;
+        }
+
+        .vert {
+            margin-bottom: 10%;
+        }
+
+        .hori {
+            margin-bottom: 0%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+        <h2>Siphon vacuum pump control</h2>
+        <p>Time now: <strong> %timeNow%</strong></p>
+        <p>IP: <strong> %ipAdress%</strong></p>
+        <p>Mac: <strong> %macAdress%</strong></p>
+        
+
+        <form action="/get" target=hidden-form>
+            Delay to active pump in Second: %waitToActive% <input type="number" name="waitToActive">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+        <form action="/get" target="hidden-form">
+            Pulse long pump in Second  : %pulseToPump% <input type="number" name="pulseToPump">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+        <form action="/get" target="hidden-form">
+            Hostname(save & reset to change) : %idHostname% <input type="text" name="idHostname">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+
+        <p> <a href="/"><button class="button">Save data</button> </a></p>
+        <p><a href="/reset"><button class="button">  RESET  </button></a><br></p>
+    </div>
