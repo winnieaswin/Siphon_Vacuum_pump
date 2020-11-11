@@ -3,6 +3,7 @@
 #include "Arduino.h"
 #include "stdio.h"
 
+
 #include "soc/soc.h"          // Disable brownour problems
 #include "soc/rtc_cntl_reg.h" // Disable brownour problems
 
@@ -312,6 +313,7 @@ void setup() {
   // put your setup code here, to run once:
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
   Serial.begin(115200);
+  
     if (!SPIFFS.begin(true))
   {
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -365,6 +367,7 @@ void setup() {
 }
 
 void loop() {
+ 
   // put your main code here, to run repeatedly:
   client.loop();
   if (!client.connected())
