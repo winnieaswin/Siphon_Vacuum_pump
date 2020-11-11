@@ -34,6 +34,7 @@ char c_relayBitL [8] = "0" ;
 char C_ip_adress [14] = "IP adress" ;//for Mqtt ID
 char C_mac_adr[18]; //for Mqtt ID
 char C_idHostname[40];
+char C_topic_Hostname[40]="esp32/";
 int LevelSensorPIN = 15;  
 int Ledboard = 2;
 int RelayCtl = 13;
@@ -357,7 +358,7 @@ void setup() {
   init_server(); //start server
   client.setServer(mqtt_server, 1883); //start mqtt
   client.setCallback(callback);
-
+  strcat(C_topic_Hostname,C_idHostname); //topic preparation
 
 
   //Init pin mode 
@@ -385,16 +386,16 @@ void loop() {
         
         digitalWrite(RelayCtl,HIGH);
         digitalWrite(Ledboard,HIGH);
-        client.publish("esp32/active",c_relayBitH);
         
-        delay(Int_pulseToPump*mS_TO_S);
-        client.publish("esp32/active",c_relayBitL);
-          //ip_adress = WiFi.localIP();
-        client.publish("esp32/idIP",C_ip_adress);
-        client.publish("esp32/idMac",C_mac_adr);
-        client.publish("esp32/idHostname",C_idHostname);
+        client.publish("esp32/active",c_relayBitH);
+        client.publish(C_topic_Hostname,c_relayBitH);
+        Serial.print("topic :");
+        Serial.println(C_topic_Hostname);
+
+        delay(Int_pulseToPump*mS_TO_S);  
         digitalWrite(RelayCtl,LOW);
         digitalWrite(Ledboard,LOW);
+        client.publish(C_topic_Hostname,c_relayBitL);
       }
     }
   }
