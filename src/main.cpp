@@ -37,8 +37,11 @@ char C_idHostname[40];
 char C_topic_Hostname[40]="esp32/";
 int LevelSensorPIN = 15;  
 int Ledboard = 2;
-int RelayCtl = 13;
-
+int RelayCtlIn = 12;
+int RelayCtlOut = 13;
+int mQtyFailCt = 5;
+int i =5; // variable for loop
+int y = 10; //variable for wifi reset
 //delay multiple
 #define uS_TO_S_FACTOR 1000000
 #define mS_TO_S 1000
@@ -57,16 +60,24 @@ const char *PARAM_pulseToPump = "pulseToPump";
 const char *PARAM_ipAdress = "ipAdress";
 const char *PARAM_macAdress = "macAdress";
 const char *PARAM_idHostname = "idHostname";
+const char *PARAM_waitToStop = "waitToStop";
+const char *PARAM_pulseToStop = "pulseToStop";
 
 
 //var delay pump
 int Int_waitToActive;
 int Int_pulseToPump;
+int Int_waitToStop;
+int Int_pulseToStop;
+//int Int_delaySiphon;
+
 String S_waitToActive;
 String S_pulseToPump;
 String S_ipAdress;
 String S_macAdress;
 String S_idHostname;
+String S_waitToStop;
+String S_pulseToStop;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -177,6 +188,20 @@ String processor(const String &var)
   {
     return String(WiFi.macAddress());
   }
+    else if (var == "waitToStop")
+  {
+       //Read waitToStop :
+    S_waitToStop = readFile(SPIFFS, "/waitToStop.txt");
+    Int_waitToStop = S_waitToStop.toInt();
+    return readFile(SPIFFS, "/waitToStop.txt");
+  }
+    else if (var == "pulseToStop")
+  {
+       //Read waitToStop :
+    S_pulseToStop = readFile(SPIFFS, "/pulseToStop.txt");
+    Int_pulseToStop = S_pulseToStop.toInt();
+    return readFile(SPIFFS, "/pulseToStop.txt");
+  }
 
   return String();
 }
@@ -222,12 +247,47 @@ void init_server() //Server init
     S_pulseToPump = readFile(SPIFFS, "/pulseToPump.txt");
     Int_pulseToPump = S_pulseToPump.toInt();
 
+    //Read pulseToStop
+    S_pulseToStop = readFile(SPIFFS, "/pulseToStop.txt");
+    Int_pulseToStop = S_pulseToStop.toInt();
+
+    //Read waitToStop :
+    S_waitToStop = readFile(SPIFFS, "/waitToStop.txt");
+    Int_waitToStop = S_waitToStop.toInt();
+
     //Read hostname
     S_idHostname = readFile(SPIFFS, "/idHostname.txt");
 
 
   server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
     ESP.restart();
+  });
+
+  
+  server.on("/AirOutOn", HTTP_GET, [](AsyncWebServerRequest *request) {
+    digitalWrite(RelayCtlOut,HIGH);
+     Serial.println("Relay Air Out on");
+     delay(1000);
+     request->redirect("/");
+
+  });
+  server.on("/AirOutOff", HTTP_GET, [](AsyncWebServerRequest *request) {
+    digitalWrite(RelayCtlOut,LOW);
+    Serial.println("Relay Air Out off");
+    delay(1000);
+     request->redirect("/");
+  });
+    server.on("/AirInOn", HTTP_GET, [](AsyncWebServerRequest *request) {
+    digitalWrite(RelayCtlIn,HIGH);
+    Serial.println("Relay Air In on");
+    delay(1000);
+     request->redirect("/");
+  });
+  server.on("/AirInOff", HTTP_GET, [](AsyncWebServerRequest *request) {
+    digitalWrite(RelayCtlIn,LOW);
+    Serial.println("Relay Air In off");
+    delay(1000);
+     request->redirect("/");
   });
 
   // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
@@ -245,13 +305,23 @@ void init_server() //Server init
       inputMessage = request->getParam(PARAM_pulseToPump)->value();
       writeFile(SPIFFS, "/pulseToPump.txt", inputMessage.c_str());
     }
-        else if (request->hasParam(PARAM_idHostname))
+    else if (request->hasParam(PARAM_idHostname))
     {
       inputMessage = request->getParam(PARAM_idHostname)->value();
       writeFile(SPIFFS, "/idHostname.txt", inputMessage.c_str());
     }
+    else if (request->hasParam(PARAM_waitToStop))
+    {
+      inputMessage = request->getParam(PARAM_waitToStop)->value();
+      writeFile(SPIFFS, "/waitToStop.txt", inputMessage.c_str());
+    }
+    else if (request->hasParam(PARAM_pulseToStop))
+    {
+      inputMessage = request->getParam(PARAM_pulseToStop)->value();
+      writeFile(SPIFFS, "/pulseToStop.txt", inputMessage.c_str());
+    }
 
-    else
+    else 
     {
       inputMessage = "No message sent";
     }
@@ -287,24 +357,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void reconnect() //reconnect mqtt server
 { 
   // Loop until we're reconnected
-  while (!client.connected()) {
+  while(!client.connected()&& (mQtyFailCt>=0)) 
+  {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
-    String clientId = "homeB001";
-    clientId += String(random(0xffff), HEX);
+      String clientId = C_idHostname ;
+      clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (client.connect(clientId.c_str())) {
+      if (client.connect(clientId.c_str())) 
+    {
       Serial.println("connected");
       // Once connected, publish an announcement...
       client.publish("outTopic", "hello world");
       // ... and resubscribe
       client.subscribe("esp32/output");
-    } else {
+      mQtyFailCt =5;
+    } 
+      else if (mQtyFailCt ==0)
+      {
+        Serial.println("Mqtt fail 5 time restart esp32");
+        ESP.restart();
+      }
+      else 
+    {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
+      mQtyFailCt--;
     }
   }
 }
@@ -364,16 +445,37 @@ void setup() {
   //Init pin mode 
   pinMode(LevelSensorPIN,INPUT_PULLDOWN);
   pinMode(Ledboard,OUTPUT);
-  pinMode(RelayCtl,OUTPUT);
+  pinMode(RelayCtlIn,OUTPUT);
+  pinMode(RelayCtlOut,OUTPUT);
 }
 
 void loop() {
  
+  if(WiFi.status() == WL_CONNECTED)
+  {
+    delay(10);
+    //Serial.println("Wifi Connected");
+    y=10;
+  }
+  else if (y>0)
+  {
+    Serial.println("Wifi No Connected");
+    WiFi.reconnect();
+    --y;
+  }
+  else if (y==0)
+  {
+    Serial.println("Wifi No Connected need to reboot");
+    ESP.restart();
+  }  
+   
+  
   // put your main code here, to run repeatedly:
   client.loop();
   if (!client.connected())
-   {
-    reconnect();
+  { 
+      i = 3;
+      reconnect();
   }
   if (digitalRead(LevelSensorPIN) == LOW) 
   {
@@ -384,27 +486,34 @@ void loop() {
       if (digitalRead(LevelSensorPIN)== LOW)
       {
         
-        digitalWrite(RelayCtl,HIGH);
+        digitalWrite(RelayCtlOut,HIGH);
         digitalWrite(Ledboard,HIGH);
         
-        client.publish("esp32/active",c_relayBitH);
         client.publish(C_topic_Hostname,c_relayBitH);
         Serial.print("topic :");
         Serial.println(C_topic_Hostname);
 
         delay(Int_pulseToPump*mS_TO_S);  
-        digitalWrite(RelayCtl,LOW);
+        digitalWrite(RelayCtlOut,LOW);
         digitalWrite(Ledboard,LOW);
         client.publish(C_topic_Hostname,c_relayBitL);
+        delay(Int_waitToStop*mS_TO_S);
+        digitalWrite(RelayCtlIn,HIGH);
+        Serial.println("Air In");
+        delay(Int_pulseToStop*mS_TO_S);
+        digitalWrite(RelayCtlIn,LOW);
+        Serial.println("End cycle");
       }
     }
   }
-    Serial.print ("Init wait to active : " );
-    Serial.println (Int_waitToActive);
-    Serial.print ("Init pulse length : " );
-    Serial.println (Int_pulseToPump );
+    //debug
+    // Serial.print ("Init wait to active : " );
+    // Serial.println (Int_waitToActive);
+    // Serial.print ("Init pulse length : " );
+    // Serial.println (Int_pulseToPump );
     digitalWrite(Ledboard,LOW);
     delay(500);
     digitalWrite(Ledboard,HIGH);
     delay(500);
+    
 }
