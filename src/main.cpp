@@ -21,13 +21,11 @@
 
 //timer interrupt
 volatile int interruptCounter;
-int timerCount; //test statement for each step in second
+int timerCount;         //test statement for each step in second
 boolean flagEx = false; // flag to excute 1 time the statement
 
 hw_timer_t *timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-
-
 
 //mqtt configuration
 const char *mqtt_server = "192.168.0.50";
@@ -50,7 +48,7 @@ char C_idHostname[40];
 char C_topic_Hostname[40] = "esp32/";
 int LevelSensorPIN = 15;
 int Ledboard = 2;
-int RelayCtlIn = 12;
+int RelayCtlIn = 14;
 int RelayCtlOut = 13;
 int mQtyFailCt = 5;
 int i = 5;  // variable for loop
@@ -371,7 +369,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 void reconnect() //reconnect mqtt server
 {
   // Loop until we're reconnected
-  while (!client.connected() && (mQtyFailCt >= 0))
+  if (!client.connected() && (mQtyFailCt >= 0))
   {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
@@ -390,7 +388,7 @@ void reconnect() //reconnect mqtt server
     else if (mQtyFailCt == 0)
     {
       Serial.println("Mqtt fail 5 time restart esp32");
-      ESP.restart();
+      //ESP.restart();
     }
     else
     {
@@ -406,33 +404,63 @@ void reconnect() //reconnect mqtt server
 //code OTA
 void init_OTA()
 {
-   ArduinoOTA
-    .onStart([]() {
-      String type;
-      if (ArduinoOTA.getCommand() == U_FLASH)
-        type = "sketch";
-      else // U_SPIFFS
-        type = "filesystem";
+  ArduinoOTA
+      .onStart([]() {
+        String type;
+        if (ArduinoOTA.getCommand() == U_FLASH)
+          type = "sketch";
+        else // U_SPIFFS
+          type = "filesystem";
 
-      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-      Serial.println("Start updating " + type);
-    })
-    .onEnd([]() {
-      Serial.println("\nEnd");
-    })
-    .onProgress([](unsigned int progress, unsigned int total) {
-      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    })
-    .onError([](ota_error_t error) {
-      Serial.printf("Error[%u]: ", error);
-      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-      else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    });
+        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+        Serial.println("Start updating " + type);
+      })
+      .onEnd([]() {
+        Serial.println("\nEnd");
+      })
+      .onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+      })
+      .onError([](ota_error_t error) {
+        Serial.printf("Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR)
+          Serial.println("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR)
+          Serial.println("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR)
+          Serial.println("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR)
+          Serial.println("Receive Failed");
+        else if (error == OTA_END_ERROR)
+          Serial.println("End Failed");
+      });
 
   ArduinoOTA.begin();
+}
+
+void checkConnection()
+{
+     if (WiFi.status() == WL_CONNECTED)
+    {
+      delay(10);
+      //Serial.println("Wifi Connected");
+      y = 10;
+    }
+    else if (y > 0)
+    {
+      WiFi.reconnect();
+      // --y; //for wifi reset check in else if (timerCount == Int_WtaPtpWtsPts)
+    }
+    else if (y == 0)
+    {
+      Serial.println("Wifi No Connected need to reboot");
+      ESP.restart();
+    }
+    // if (!client.connected())
+    // {
+    //   i = 3;
+    //   reconnect();
+    // }
 }
 
 void IRAM_ATTR onTimer()
@@ -501,6 +529,8 @@ void setup()
   pinMode(Ledboard, OUTPUT);
   pinMode(RelayCtlIn, OUTPUT);
   pinMode(RelayCtlOut, OUTPUT);
+  digitalWrite(RelayCtlIn,LOW);
+  digitalWrite(RelayCtlOut,LOW);
 
   //OTA init
   init_OTA();
@@ -508,29 +538,7 @@ void setup()
 
 void loop()
 {
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    delay(10);
-    //Serial.println("Wifi Connected");
-    y = 10;
-  }
-  else if (y > 0)
-  {
-    Serial.println("Wifi No Connected");
-    WiFi.reconnect();
-    --y;
-  }
-  else if (y == 0)
-  {
-    Serial.println("Wifi No Connected need to reboot");
-    ESP.restart();
-  }
-  if (!client.connected())
-  {
-    i = 3;
-    reconnect();
-  }
+  checkConnection();
   client.loop();
   ArduinoOTA.handle();
 
@@ -560,8 +568,8 @@ void loop()
     portENTER_CRITICAL(&timerMux);
     interruptCounter = 0;
     portEXIT_CRITICAL(&timerMux);
-    timerCount++; 
-    flagEx = false; 
+    timerCount++;
+    flagEx = false;
     Serial.print("timerCount_b: ");
     Serial.println(timerCount);
   }
@@ -621,6 +629,10 @@ void loop()
       timerAlarmDisable(timer);
       timerCount = 0;
       flagEx = true;
+      //for wifi reset
+      --y; 
+      Serial.print("count down reset for no Wifi : ");
+      Serial.println(y);
     }
   }
   else if (timerCount == 0)
