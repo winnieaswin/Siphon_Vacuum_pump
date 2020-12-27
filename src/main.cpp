@@ -21,8 +21,11 @@
 
 //timer interrupt
 volatile int interruptCounter;
-int timerCount;         //test statement for each step in second
-boolean flagEx = false; // flag to excute 1 time the statement
+int timerCount;          //test statement for each step in second
+boolean flagEx = false;  // flag to excute 1 time the statement
+boolean flagLvl = false; // flag from water level sensor
+unsigned int timer1s;
+boolean cycling = false; 
 
 hw_timer_t *timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -440,27 +443,30 @@ void init_OTA()
 
 void checkConnection()
 {
-     if (WiFi.status() == WL_CONNECTED)
-    {
-      delay(10);
-      //Serial.println("Wifi Connected");
-      y = 10;
-    }
-    else if (y > 0)
-    {
-      WiFi.reconnect();
-      // --y; //for wifi reset check in else if (timerCount == Int_WtaPtpWtsPts)
-    }
-    else if (y == 0)
-    {
-      Serial.println("Wifi No Connected need to reboot");
-      ESP.restart();
-    }
-    // if (!client.connected())
-    // {
-    //   i = 3;
-    //   reconnect();
-    // }
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    delay(10);
+    Serial.println("Wifi Connected");
+    y = 10;
+  }
+  else if ((WiFi.status() != WL_CONNECTED)&& (y>0)&&(cycling == false))
+  {
+    WiFi.reconnect();
+    delay(100);
+    Serial.print("Wifi no connected : ");
+    Serial.println(y);
+    --y; //decrease in interrupt
+  }
+  else if (y == 0)
+  {
+    Serial.println("Wifi No Connected need to reboot");
+    ESP.restart();
+  }
+  // if (!client.connected())
+  // {
+  //   i = 3;
+  //   reconnect();
+  // }
 }
 
 void IRAM_ATTR onTimer()
@@ -478,6 +484,7 @@ void setup()
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, 1000000, true);
+  timerAlarmEnable(timer);
 
   if (!SPIFFS.begin(true))
   {
@@ -529,8 +536,8 @@ void setup()
   pinMode(Ledboard, OUTPUT);
   pinMode(RelayCtlIn, OUTPUT);
   pinMode(RelayCtlOut, OUTPUT);
-  digitalWrite(RelayCtlIn,LOW);
-  digitalWrite(RelayCtlOut,LOW);
+  digitalWrite(RelayCtlIn, LOW);
+  digitalWrite(RelayCtlOut, LOW);
 
   //OTA init
   init_OTA();
@@ -538,7 +545,8 @@ void setup()
 
 void loop()
 {
-  checkConnection();
+
+  
   client.loop();
   ArduinoOTA.handle();
 
@@ -547,7 +555,8 @@ void loop()
     delay(100);
     if (digitalRead(LevelSensorPIN) == LOW)
     {
-      timerAlarmEnable(timer);
+      flagLvl = true;
+      cycling = true;
     }
   }
 
@@ -564,15 +573,20 @@ void loop()
   //timer for excution different step.
   if (interruptCounter > 0)
   {
-
     portENTER_CRITICAL(&timerMux);
     interruptCounter = 0;
     portEXIT_CRITICAL(&timerMux);
-    timerCount++;
-    flagEx = false;
-    Serial.print("timerCount_b: ");
-    Serial.println(timerCount);
+    if (flagLvl)
+    {
+      timerCount++;
+      flagEx = false;
+      Serial.print("timerCount_b: ");
+      Serial.println(timerCount);
+    }
+    timer1s++;
+    
   }
+
 
   if (timerCount == Int_waitToActive)
   {
@@ -626,13 +640,10 @@ void loop()
       client.publish(C_topic_Hostname, c_relayBitL);
       Serial.println("End cycle");
       digitalWrite(Ledboard, LOW);
-      timerAlarmDisable(timer);
       timerCount = 0;
       flagEx = true;
-      //for wifi reset
-      --y; 
-      Serial.print("count down reset for no Wifi : ");
-      Serial.println(y);
+      flagLvl = false;
+      cycling = false;
     }
   }
   else if (timerCount == 0)
@@ -641,5 +652,12 @@ void loop()
     delay(500);
     digitalWrite(Ledboard, HIGH);
     delay(500);
+  }
+
+  if (timer1s>0)
+  {
+    timer1s = 0;
+    checkConnection();
+    // y--;
   }
 }
