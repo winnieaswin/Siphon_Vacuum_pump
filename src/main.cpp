@@ -26,6 +26,9 @@ boolean flagEx = false;  // flag to excute 1 time the statement
 boolean flagLvl = false; // flag from water level sensor
 unsigned int timer1s;
 boolean cycling = false; 
+unsigned int intResetCount;
+char charResetCount[200];
+String S_ResetCount;
 
 hw_timer_t *timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -76,6 +79,7 @@ const char *PARAM_macAdress = "macAdress";
 const char *PARAM_idHostname = "idHostname";
 const char *PARAM_waitToStop = "waitToStop";
 const char *PARAM_pulseToStop = "pulseToStop";
+const char *PARAM_resetCount = "resetCount";
 
 //var delay pump
 int Int_waitToActive;
@@ -202,6 +206,10 @@ String processor(const String &var)
   {
     return String(WiFi.macAddress());
   }
+  else if (var == "resetCount")
+  {
+    return readFile(SPIFFS,"/resetCount.txt");
+  }
   else if (var == "waitToStop")
   {
     //Read waitToStop :
@@ -271,7 +279,12 @@ void init_server() //Server init
   //Read hostname
   S_idHostname = readFile(SPIFFS, "/idHostname.txt");
 
+  // //Read Reset Count 
+  // S_ResetCount = readFile(SPIFFS, "/resetCount.txt");
+
   server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
+    writeFile(SPIFFS, "/resetCount.txt", "0" );
+    delay(10);
     ESP.restart();
   });
 
@@ -460,6 +473,9 @@ void checkConnection()
   else if (y == 0)
   {
     Serial.println("Wifi No Connected need to reboot");
+    S_ResetCount = readFile(SPIFFS,"/resetCount.txt");
+    intResetCount = S_ResetCount.toInt() + 1;
+    writeFile(SPIFFS, "/resetCount.txt", itoa(intResetCount, charResetCount, 10) );
     ESP.restart();
   }
   // if (!client.connected())
