@@ -25,7 +25,7 @@ int timerCount;          //test statement for each step in second
 boolean flagEx = false;  // flag to excute 1 time the statement
 boolean flagLvl = false; // flag from water level sensor
 unsigned int timer1s;
-boolean cycling = false; 
+boolean cycling = false;
 unsigned int intResetCount;
 char charResetCount[200];
 String S_ResetCount;
@@ -208,7 +208,7 @@ String processor(const String &var)
   }
   else if (var == "resetCount")
   {
-    return readFile(SPIFFS,"/resetCount.txt");
+    return readFile(SPIFFS, "/resetCount.txt");
   }
   else if (var == "waitToStop")
   {
@@ -279,11 +279,11 @@ void init_server() //Server init
   //Read hostname
   S_idHostname = readFile(SPIFFS, "/idHostname.txt");
 
-  // //Read Reset Count 
+  // //Read Reset Count
   // S_ResetCount = readFile(SPIFFS, "/resetCount.txt");
 
   server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
-    writeFile(SPIFFS, "/resetCount.txt", "0" );
+    writeFile(SPIFFS, "/resetCount.txt", "0");
     delay(10);
     ESP.restart();
   });
@@ -404,7 +404,6 @@ void reconnect() //reconnect mqtt server
     else if (mQtyFailCt == 0)
     {
       Serial.println("Mqtt fail 5 time restart esp32");
-      //ESP.restart();
     }
     else
     {
@@ -462,7 +461,7 @@ void checkConnection()
     Serial.println("Wifi Connected");
     y = 10;
   }
-  else if ((WiFi.status() != WL_CONNECTED)&& (y>0)&&(cycling == false))
+  else if ((WiFi.status() != WL_CONNECTED) && (y > 0) && (cycling == false))
   {
     WiFi.reconnect();
     delay(100);
@@ -473,16 +472,11 @@ void checkConnection()
   else if (y == 0)
   {
     Serial.println("Wifi No Connected need to reboot");
-    S_ResetCount = readFile(SPIFFS,"/resetCount.txt");
+    S_ResetCount = readFile(SPIFFS, "/resetCount.txt");
     intResetCount = S_ResetCount.toInt() + 1;
-    writeFile(SPIFFS, "/resetCount.txt", itoa(intResetCount, charResetCount, 10) );
+    writeFile(SPIFFS, "/resetCount.txt", itoa(intResetCount, charResetCount, 10));
     ESP.restart();
   }
-  // if (!client.connected())
-  // {
-  //   i = 3;
-  //   reconnect();
-  // }
 }
 
 void IRAM_ATTR onTimer()
@@ -561,8 +555,14 @@ void setup()
 
 void loop()
 {
-
-  
+    if (timer1s > 0)
+  {
+    timer1s = 0;
+    checkConnection();
+  }
+  if (!client.connected()) {
+    reconnect();
+  }
   client.loop();
   ArduinoOTA.handle();
 
@@ -579,12 +579,6 @@ void loop()
   Int_WtaPtp = Int_waitToActive + Int_pulseToPump;
   Int_WtaPtpWts = Int_waitToActive + Int_pulseToPump + Int_waitToStop;
   Int_WtaPtpWtsPts = Int_waitToActive + Int_pulseToPump + Int_waitToStop + Int_pulseToStop;
-  // Serial.print("Int_WtaPtp : ");
-  // Serial.println(Int_WtaPtp);
-  // Serial.print("Int_WtaPtpWts : ");
-  // Serial.println(Int_WtaPtpWts);
-  // Serial.print("Int_WtaPtpWtsPts : ");
-  // Serial.println(Int_WtaPtpWtsPts);
 
   //timer for excution different step.
   if (interruptCounter > 0)
@@ -592,7 +586,7 @@ void loop()
     portENTER_CRITICAL(&timerMux);
     interruptCounter = 0;
     portEXIT_CRITICAL(&timerMux);
-    if (flagLvl)
+    if (flagLvl) // active by lvl sensor
     {
       timerCount++;
       flagEx = false;
@@ -600,13 +594,11 @@ void loop()
       Serial.println(timerCount);
     }
     timer1s++;
-    
   }
-
 
   if (timerCount == Int_waitToActive)
   {
-    if (flagEx == false)
+    if (flagEx == false) // for executing 1 time
     {
       digitalWrite(Ledboard, HIGH);
       time(&now);
@@ -658,22 +650,19 @@ void loop()
       digitalWrite(Ledboard, LOW);
       timerCount = 0;
       flagEx = true;
-      flagLvl = false;
+      flagLvl = false; //flag for reading lvl sensor
       cycling = false;
     }
   }
   else if (timerCount == 0)
   {
+    digitalWrite(RelayCtlIn, LOW);
+    digitalWrite(RelayCtlOut, LOW);
     digitalWrite(Ledboard, LOW);
     delay(500);
     digitalWrite(Ledboard, HIGH);
     delay(500);
   }
 
-  if (timer1s>0)
-  {
-    timer1s = 0;
-    checkConnection();
-    // y--;
-  }
+
 }
