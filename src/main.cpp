@@ -656,8 +656,6 @@ void loop()
   }
   else if (timerCount == 0)
   {
-    digitalWrite(RelayCtlIn, LOW);
-    digitalWrite(RelayCtlOut, LOW);
     digitalWrite(Ledboard, LOW);
     delay(500);
     digitalWrite(Ledboard, HIGH);
