@@ -25,14 +25,14 @@
         <p>IP: <strong> %ipAdress%</strong></p>
         <p>Mac: <strong> %macAdress%</strong></p>
         <p>Reset count : <strong> %resetCount%</strong></p>
-        
+
 
         <form action="/get" target=hidden-form>
             Delay to active pump in Second: %waitToActive% <input type="number" name="waitToActive">
             <input type="submit" value="Submit" onclick=" submitMessage()">
         </form><br>
         <form action="/get" target="hidden-form">
-            Pulse long pump in Second  : %pulseToPump% <input type="number" name="pulseToPump">
+            Pulse long pump in Second : %pulseToPump% <input type="number" name="pulseToPump">
             <input type="submit" value="Submit" onclick=" submitMessage()">
         </form><br>
         <form action="/get" target=hidden-form>
@@ -43,22 +43,32 @@
             Pulse long pump to stop in Second: %pulseToStop% <input type="number" name="pulseToStop">
             <input type="submit" value="Submit" onclick=" submitMessage()">
         </form><br>
+        <form action="/get" target=hidden-form>
+            Reactive pulse every second: %2ndPSt% <input type="number" name="2ndPSt">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+        <form action="/get" target=hidden-form>
+            Pulse long pump for every second: %2ndPSpulseLenght% <input type="number" name="2ndPSpulseLenght">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+
+
         <form action="/get" target="hidden-form">
             Hostname(save & reset to change) : %idHostname% <input type="text" name="idHostname">
             <input type="submit" value="Submit" onclick=" submitMessage()">
         </form><br>
         <table style="width:100%">
-        <tr>
-            <th><a href="/AirOutOn"><button class="button">Air Out On </button></a><br></th>
-            <th><a href="/AirOutOff"><button class="button">Air Out Off </button></a><br></th>
-            <th><a href="/"><button class="button">Save data</button> </a></th>
-        </tr>
-        <tr>
-            <th><a href="/AirInOn"><button class="button">Air In On </button></a><br></th>
-            <th><a href="/AirInOff"><button class="button">Air In Off </button></a><br></th>
-            <th><a href="/reset"><button class="button">  RESET  </button></a></th>
-        </tr>
+            <tr>
+                <th><a href="/AirOutOn"><button class="button">Air Out On </button></a><br></th>
+                <th><a href="/AirOutOff"><button class="button">Air Out Off </button></a><br></th>
+                <th><a href="/"><button class="button">Save data</button> </a></th>
+            </tr>
+            <tr>
+                <th><a href="/AirInOn"><button class="button">Air In On </button></a><br></th>
+                <th><a href="/AirInOff"><button class="button">Air In Off </button></a><br></th>
+                <th><a href="/reset"><button class="button"> RESET </button></a></th>
+            </tr>
         </table>
-        
-    
+
+
     </div>
