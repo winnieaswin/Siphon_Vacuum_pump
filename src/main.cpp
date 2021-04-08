@@ -22,8 +22,10 @@
 // timer interrupt
 volatile int interruptCounter;
 int timerCount;          // test statement for each step in second
+int timerCountInactive;  // test statement for inactive each step in second
 boolean flagEx = false;  // flag to excute 1 time the statement
 boolean flagLvl = false; // flag from water level sensor
+boolean flagInactive = false;
 unsigned int timer1s;
 boolean cycling = false;
 unsigned int intResetCount;
@@ -52,6 +54,7 @@ char C_ip_adress[14] = "IP adress"; // for Mqtt ID
 char C_mac_adr[18];                 // for Mqtt ID
 char C_idHostname[40];
 char C_topic_Hostname[40] = "esp32/";
+char C_timeCount[8];
 int LevelSensorPIN = 15;
 int Ledboard = 2;
 int RelayCtlIn = 14;
@@ -81,8 +84,13 @@ const char *PARAM_idHostname = "idHostname";
 const char *PARAM_waitToStop = "waitToStop";
 const char *PARAM_pulseToStop = "pulseToStop";
 const char *PARAM_resetCount = "resetCount";
+const char *PARAM_timeCount = "timeCount";
 const char *PARAM_2ndPSt = "2ndPSt";
 const char *PARAM_2ndPSpulseLenght = "2ndPSpulseLenght";
+const char *PARAM_inactiveP = "inactiveP";
+const char *PARAM_inactivePulseLenght = "inactivePulseLenght";
+
+
 
 // var delay pump
 int Int_waitToActive;
@@ -91,10 +99,12 @@ int Int_waitToStop;
 int Int_pulseToStop;
 int Int_2ndPSt;           // delay to active again pump
 int Int_2ndPSpulseLenght; // pulse lengnt for second pump
+int Int_inactiveP; // inactive pump
+int Int_inactivePulseLenght; //pulse lenght inactive pump
 
 int Int_WtaPtp = 0; // sum Int_waitToActive + Int_pulseToPump
 int Int_WtaPtpWts =
-    0; // sum Int_waitToActive + Int_pulseToPump + Int_waitToStop
+    0;                    // sum Int_waitToActive + Int_pulseToPump + Int_waitToStop
 int Int_WtaPtpWtsPts = 0; // sum Int_waitToActive + Int_pulseToPump +
                           // Int_waitToStop + Int_pulseToStop
 // int Int_delaySiphon;
@@ -108,28 +118,34 @@ String S_waitToStop;
 String S_pulseToStop;
 String S_2ndPSt;           // delay to active again pump
 String S_2ndPSpulseLenght; // pulse lengnt for second pump
+String S_inactiveP; // inactive pump
+String S_inactivePulseLenght; // inactive pulse lenght
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
 // SPIFFS read & write
-String readFile(fs::FS &fs, const char *path) {
+String readFile(fs::FS &fs, const char *path)
+{
   Serial.printf("Reading file: %s\r\n", path);
   File file = fs.open(path, "r");
-  if (!file || file.isDirectory()) {
+  if (!file || file.isDirectory())
+  {
     Serial.println("- empty file or failed to open file");
     return String();
   }
   Serial.println("- read from file:");
   String fileContent;
-  while (file.available()) {
+  while (file.available())
+  {
     fileContent += String((char)file.read());
   }
   Serial.println(fileContent);
   return fileContent;
 }
 
-bool init_wifi() {
+bool init_wifi()
+{
   int connAttempts = 0;
   Serial.println("\r\nConnecting to: " + String(ssid));
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
@@ -139,7 +155,8 @@ bool init_wifi() {
   WiFi.setHostname(C_idHostname);
   WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(2000);
     Serial.print(".");
     if (connAttempts > 10)
@@ -149,10 +166,12 @@ bool init_wifi() {
   return true;
 }
 
-void init_time() {
+void init_time()
+{
   struct tm timeinfo;
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  if (!getLocalTime(&timeinfo)) {
+  if (!getLocalTime(&timeinfo))
+  {
     Serial.println("Failed to obtain time");
     return;
   }
@@ -162,7 +181,8 @@ void init_time() {
   timeinfo = {0};
   int retry = 0;
   const int retry_count = 10;
-  while (timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
+  while (timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count)
+  {
     Serial.printf("Waiting for system time to be set... (%d/%d)\n", retry,
                   retry_count);
     delay(2000);
@@ -172,64 +192,107 @@ void init_time() {
 }
 
 // Processor read back to value on website
-String processor(const String &var) {
-  if (var == "waitToActive") {
+String processor(const String &var)
+{
+  if (var == "waitToActive")
+  {
     // Read waitToActive :
     S_waitToActive = readFile(SPIFFS, "/waitToActive.txt");
     Int_waitToActive = S_waitToActive.toInt();
     return readFile(SPIFFS, "/waitToActive.txt");
-  } else if (var == "pulseToPump") {
+  }
+  else if (var == "pulseToPump")
+  {
     // Read pulseToPump
     S_pulseToPump = readFile(SPIFFS, "/pulseToPump.txt");
     Int_pulseToPump = S_pulseToPump.toInt();
     return readFile(SPIFFS, "/pulseToPump.txt");
-  } else if (var == "idHostname") {
+  }
+  else if (var == "idHostname")
+  {
     S_idHostname = readFile(SPIFFS, "/idHostname.txt");
     return readFile(SPIFFS, "/idHostname.txt");
-  } else if (var == "timeNow") {
+  }
+  else if (var == "timeNow")
+  {
     time(&now);
     localtime_r(&now, &timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%F_%H_%M_%S", &timeinfo);
     return String(strftime_buf);
-  } else if (var == "ipAdress") {
+  }
+  else if (var == "ipAdress")
+  {
     return String(WiFi.localIP().toString());
-  } else if (var == "macAdress") {
+  }
+  else if (var == "macAdress")
+  {
     return String(WiFi.macAddress());
-  } else if (var == "resetCount") {
+  }
+  else if (var == "timeCount")
+  {
+    return readFile(SPIFFS, "/timeCount.txt");
+  }
+  else if (var == "resetCount")
+  {
     return readFile(SPIFFS, "/resetCount.txt");
-  } else if (var == "waitToStop") {
+  }
+  else if (var == "waitToStop")
+  {
     // Read waitToStop :
     S_waitToStop = readFile(SPIFFS, "/waitToStop.txt");
     Int_waitToStop = S_waitToStop.toInt();
     return readFile(SPIFFS, "/waitToStop.txt");
-  } else if (var == "pulseToStop") {
+  }
+  else if (var == "pulseToStop")
+  {
     // Read waitToStop :
     S_pulseToStop = readFile(SPIFFS, "/pulseToStop.txt");
     Int_pulseToStop = S_pulseToStop.toInt();
     return readFile(SPIFFS, "/pulseToStop.txt");
-  } else if (var == "2ndPSt") {
+  }
+  else if (var == "2ndPSt")
+  {
     S_2ndPSt = readFile(SPIFFS, "/2ndPSt.txt");
     Int_2ndPSt = S_2ndPSt.toInt();
     return readFile(SPIFFS, "/2ndPSt.txt");
-  } else if (var == "2ndPSpulseLenght") {
+  }
+  else if (var == "2ndPSpulseLenght")
+  {
     S_2ndPSpulseLenght = readFile(SPIFFS, "/2ndPSpulseLenght.txt");
     Int_2ndPSpulseLenght = S_2ndPSpulseLenght.toInt();
     return readFile(SPIFFS, "/2ndPSpulseLenght.txt");
+  }
+  else if (var == "inactiveP")
+  {
+    S_inactiveP = readFile(SPIFFS, "/inactiveP.txt");
+    Int_inactiveP = S_inactiveP.toInt();
+    return readFile(SPIFFS, "/inactiveP.txt");
+  }
+  else if (var == "inactivePulseLenght")
+  {
+    S_inactivePulseLenght = readFile(SPIFFS, "/inactivePulseLenght.txt");
+    Int_inactivePulseLenght = S_inactivePulseLenght.toInt();
+    return readFile(SPIFFS, "/inactivePulseLenght.txt");
   }
 
   return String();
 }
 
-void writeFile(fs::FS &fs, const char *path, const char *message) {
+void writeFile(fs::FS &fs, const char *path, const char *message)
+{
   Serial.printf("Writing file: %s\r\n", path);
   File file = fs.open(path, "w");
-  if (!file) {
+  if (!file)
+  {
     Serial.println("- failed to open file for writing");
     return;
   }
-  if (file.print(message)) {
+  if (file.print(message))
+  {
     Serial.println("- file written");
-  } else {
+  }
+  else
+  {
     Serial.println("- write failed");
   }
 }
@@ -238,7 +301,8 @@ void writeFile(fs::FS &fs, const char *path, const char *message) {
 void init_server() // Server init
 {
   File file = SPIFFS.open("/index.html", "r");
-  if (!file) {
+  if (!file)
+  {
     Serial.println("file open failed");
   }
   // Route for root / web page
@@ -269,6 +333,14 @@ void init_server() // Server init
   // Read lenght second pump every second
   S_2ndPSpulseLenght = readFile(SPIFFS, "/2ndPSpulseLenght.txt");
   Int_2ndPSpulseLenght = S_2ndPSpulseLenght.toInt();
+
+  // Read inactive pump 
+  S_inactiveP = readFile(SPIFFS, "/inactiveP.txt");
+  Int_inactiveP = S_inactiveP.toInt();
+
+  // Read inactive pump lenght 
+  S_inactivePulseLenght = readFile(SPIFFS, "/inactivePulseLenght.txt");
+  Int_inactivePulseLenght = S_inactivePulseLenght.toInt();
 
   // Read hostname
   S_idHostname = readFile(SPIFFS, "/idHostname.txt");
@@ -312,30 +384,53 @@ void init_server() // Server init
     String inputMessage;
     // String inputParam; //no used
     // GET timeBetween value on <ESP_IP>/get?timeBetween=<inputMessage>
-    if (request->hasParam(PARAM_waitToActive)) {
+    if (request->hasParam(PARAM_waitToActive))
+    {
       inputMessage = request->getParam(PARAM_waitToActive)->value();
       writeFile(SPIFFS, "/waitToActive.txt", inputMessage.c_str());
-    } else if (request->hasParam(PARAM_pulseToPump)) {
+    }
+    else if (request->hasParam(PARAM_pulseToPump))
+    {
       inputMessage = request->getParam(PARAM_pulseToPump)->value();
       writeFile(SPIFFS, "/pulseToPump.txt", inputMessage.c_str());
-    } else if (request->hasParam(PARAM_idHostname)) {
+    }
+    else if (request->hasParam(PARAM_idHostname))
+    {
       inputMessage = request->getParam(PARAM_idHostname)->value();
       writeFile(SPIFFS, "/idHostname.txt", inputMessage.c_str());
-    } else if (request->hasParam(PARAM_waitToStop)) {
+    }
+    else if (request->hasParam(PARAM_waitToStop))
+    {
       inputMessage = request->getParam(PARAM_waitToStop)->value();
       writeFile(SPIFFS, "/waitToStop.txt", inputMessage.c_str());
-    } else if (request->hasParam(PARAM_pulseToStop)) {
+    }
+    else if (request->hasParam(PARAM_pulseToStop))
+    {
       inputMessage = request->getParam(PARAM_pulseToStop)->value();
       writeFile(SPIFFS, "/pulseToStop.txt", inputMessage.c_str());
-    } else if (request->hasParam(PARAM_2ndPSt)) {
+    }
+    else if (request->hasParam(PARAM_2ndPSt))
+    {
       inputMessage = request->getParam(PARAM_2ndPSt)->value();
       writeFile(SPIFFS, "/2ndPSt.txt", inputMessage.c_str());
-    } else if (request->hasParam(PARAM_2ndPSpulseLenght)) {
+    }
+    else if (request->hasParam(PARAM_2ndPSpulseLenght))
+    {
       inputMessage = request->getParam(PARAM_2ndPSpulseLenght)->value();
       writeFile(SPIFFS, "/2ndPSpulseLenght.txt", inputMessage.c_str());
     }
-
-    else {
+    else if (request->hasParam(PARAM_inactiveP))
+    {
+      inputMessage = request->getParam(PARAM_inactiveP)->value();
+      writeFile(SPIFFS, "/inactiveP.txt", inputMessage.c_str());
+    }
+    else if (request->hasParam(PARAM_inactivePulseLenght))
+    {
+      inputMessage = request->getParam(PARAM_inactivePulseLenght)->value();
+      writeFile(SPIFFS, "/inactivePulseLenght.txt", inputMessage.c_str());
+    }
+    else
+    {
       inputMessage = "No message sent";
     }
     request->send(200, "text/text", inputMessage);
@@ -344,22 +439,28 @@ void init_server() // Server init
 } // end Server init
 
 // call back mqtt
-void callback(char *topic, byte *payload, unsigned int length) {
+void callback(char *topic, byte *payload, unsigned int length)
+{
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
   String messageTemp;
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < length; i++)
+  {
     Serial.print((char)payload[i]);
   }
   Serial.println();
   // Switch on the LED if an 1 was received as first character
-  if (String(topic) == "esp32/output") {
+  if (String(topic) == "esp32/output")
+  {
     Serial.print("Changing output to ");
-    if (messageTemp == "on") {
+    if (messageTemp == "on")
+    {
       Serial.println("on");
       digitalWrite(Ledboard, HIGH);
-    } else if (messageTemp == "off") {
+    }
+    else if (messageTemp == "off")
+    {
       Serial.println("off");
       digitalWrite(Ledboard, LOW);
     }
@@ -369,22 +470,28 @@ void callback(char *topic, byte *payload, unsigned int length) {
 void reconnect() // reconnect mqtt server
 {
   // Loop until we're reconnected
-  if (!client.connected() && (mQtyFailCt >= 0)) {
+  if (!client.connected() && (mQtyFailCt >= 0))
+  {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = C_idHostname;
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
-    if (client.connect(clientId.c_str())) {
+    if (client.connect(clientId.c_str()))
+    {
       Serial.println("connected");
       // Once connected, publish an announcement...
       client.publish("outTopic", "hello world");
       // ... and resubscribe
       client.subscribe("esp32/output");
       mQtyFailCt = 5;
-    } else if (mQtyFailCt == 0) {
+    }
+    else if (mQtyFailCt == 0)
+    {
       Serial.println("Mqtt fail 5 time restart esp32");
-    } else {
+    }
+    else
+    {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
@@ -395,7 +502,8 @@ void reconnect() // reconnect mqtt server
   }
 }
 // code OTA
-void init_OTA() {
+void init_OTA()
+{
   ArduinoOTA
       .onStart([]() {
         String type;
@@ -429,18 +537,24 @@ void init_OTA() {
   ArduinoOTA.begin();
 }
 
-void checkConnection() {
-  if (WiFi.status() == WL_CONNECTED) {
+void checkConnection()
+{
+  if (WiFi.status() == WL_CONNECTED)
+  {
     delay(10);
     Serial.println("Wifi Connected");
     y = 10;
-  } else if ((WiFi.status() != WL_CONNECTED) && (y > 0) && (cycling == false)) {
+  }
+  else if ((WiFi.status() != WL_CONNECTED) && (y > 0) && (cycling == false))
+  {
     WiFi.reconnect();
     delay(100);
     Serial.print("Wifi no connected : ");
     Serial.println(y);
     --y; // decrease in interrupt
-  } else if (y == 0) {
+  }
+  else if (y == 0)
+  {
     Serial.println("Wifi No Connected need to reboot");
     S_ResetCount = readFile(SPIFFS, "/resetCount.txt");
     intResetCount = S_ResetCount.toInt() + 1;
@@ -450,13 +564,15 @@ void checkConnection() {
   }
 }
 
-void IRAM_ATTR onTimer() {
+void IRAM_ATTR onTimer()
+{
   portENTER_CRITICAL_ISR(&timerMux);
   interruptCounter++;
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-void setup() {
+void setup()
+{
   // put your setup code here, to run once:
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // disable brownout detector
   Serial.begin(115200);
@@ -465,15 +581,19 @@ void setup() {
   timerAlarmWrite(timer, 1000000, true);
   timerAlarmEnable(timer);
 
-  if (!SPIFFS.begin(true)) {
+  if (!SPIFFS.begin(true))
+  {
     Serial.println("An Error has occurred while mounting SPIFFS");
     ESP.restart();
-  } else {
+  }
+  else
+  {
     delay(500);
     Serial.println("SPIFFS mounted successfully");
   }
   Serial.write("Hello world");
-  if (init_wifi()) { // Connected to WiFi
+  if (init_wifi())
+  { // Connected to WiFi
     internet_connected = true;
     Serial.println("Internet connected");
     // Print ESP32 Local IP Address
@@ -492,10 +612,13 @@ void setup() {
     Serial.write("Wifi connected");
   }
   // check SPIFFS
-  if (!SPIFFS.begin(true)) {
+  if (!SPIFFS.begin(true))
+  {
     Serial.println("An Error has occurred while mounting SPIFFS");
     ESP.restart();
-  } else {
+  }
+  else
+  {
     delay(500);
     Serial.println("SPIFFS mounted successfully");
   }
@@ -517,22 +640,29 @@ void setup() {
   init_OTA();
 }
 
-void loop() {
-  if (timer1s > 0) {
+void loop()
+{
+  if (timer1s > 0)
+  {
     timer1s = 0;
     checkConnection();
   }
-  if (!client.connected()) {
+  if (!client.connected())
+  {
     reconnect();
   }
   client.loop();
   ArduinoOTA.handle();
 
-  if (digitalRead(LevelSensorPIN) == LOW) {
+  if (digitalRead(LevelSensorPIN) == LOW)
+  {
     delay(100);
-    if (digitalRead(LevelSensorPIN) == LOW) {
+    if (digitalRead(LevelSensorPIN) == LOW)
+    {
       flagLvl = true;
       cycling = true;
+      flagInactive = false;
+      timerCountInactive = 0;
     }
   }
 
@@ -541,21 +671,31 @@ void loop() {
   Int_WtaPtpWtsPts = Int_waitToActive + Int_pulseToPump + Int_waitToStop + Int_pulseToStop;
 
   // timer for excution different step.
-  if (interruptCounter > 0) {
+  if (interruptCounter > 0)
+  {
     portENTER_CRITICAL(&timerMux);
     interruptCounter = 0;
     portEXIT_CRITICAL(&timerMux);
     if (flagLvl) // active by lvl sensor
     {
       timerCount++;
+      writeFile(SPIFFS, "/timeCount.txt", itoa(timerCount, C_timeCount, 10));
       flagEx = false;
       Serial.print("timerCount_b: ");
       Serial.println(timerCount);
     }
+    if (flagInactive)
+    {
+      timerCountInactive++;
+      flagEx = false;
+      Serial.print("timerCountInactive: ");
+      Serial.println(timerCountInactive);
+    }
     timer1s++;
   }
 
-  if (timerCount == Int_waitToActive) {
+  if (timerCount == Int_waitToActive)
+  {
     if (flagEx == false) // for executing 1 time
     {
 
@@ -572,24 +712,33 @@ void loop() {
       digitalWrite(Ledboard, HIGH);
       flagEx = true;
     }
-  } else if (timerCount == Int_WtaPtp) {
-    if (flagEx == false) {
+  }
+  else if (timerCount == Int_WtaPtp)
+  {
+    if (flagEx == false)
+    {
       Serial.println("Stop Relay");
       digitalWrite(RelayCtlOut, LOW);
       digitalWrite(Ledboard, LOW);
       flagEx = true;
     }
-  } else if ((timerCount == (Int_WtaPtp + Int_2ndPSt)) &&
-             (timerCount < Int_WtaPtpWts)) {
-    if (flagEx == false) {
+  }
+  else if ((timerCount == (Int_WtaPtp + Int_2ndPSt)) &&
+           (timerCount < Int_WtaPtpWts))
+  {
+    if (flagEx == false)
+    {
       Serial.println("Start Relay second time");
       digitalWrite(RelayCtlOut, HIGH);
       digitalWrite(Ledboard, HIGH);
       flagEx = true;
     }
-  } else if ((timerCount == (Int_WtaPtp + Int_2ndPSt + Int_2ndPSpulseLenght)) &&
-             (timerCount < Int_WtaPtpWts)) {
-    if (flagEx == false) {
+  }
+  else if ((timerCount == (Int_WtaPtp + Int_2ndPSt + Int_2ndPSpulseLenght)) &&
+           (timerCount < Int_WtaPtpWts))
+  {
+    if (flagEx == false)
+    {
       Serial.println("Stop Relay second time");
       digitalWrite(RelayCtlOut, LOW);
       digitalWrite(Ledboard, LOW);
@@ -598,15 +747,22 @@ void loop() {
     }
   }
 
-  else if (timerCount == Int_WtaPtpWts) {
-    if (flagEx == false) {
+  else if (timerCount == Int_WtaPtpWts)
+  {
+    if (flagEx == false)
+    {
       Serial.println("Air In");
       digitalWrite(RelayCtlIn, HIGH);
+      digitalWrite(RelayCtlOut,LOW);
       flagEx = true;
     }
-  } else if (timerCount >= Int_WtaPtpWtsPts) {
-    if (flagEx == false) {
+  }
+  else if (timerCount == Int_WtaPtpWtsPts)
+  {
+    if (flagEx == false)
+    {
       digitalWrite(RelayCtlIn, LOW);
+      digitalWrite(RelayCtlOut,LOW);
       time(&now);
       localtime_r(&now, &timeinfo);
       strftime(strftime_buf, sizeof(strftime_buf), "%F_%H_%M_%S", &timeinfo);
@@ -617,16 +773,45 @@ void loop() {
       client.publish(C_topic_Hostname, c_relayBitL);
       Serial.println("End cycle");
       digitalWrite(Ledboard, LOW);
-      timerCount = 0;
       Int_2ndPSt = S_2ndPSt.toInt();
+      timerCount = 0;
       flagEx = true;
       flagLvl = false; // flag for reading lvl sensor
       cycling = false;
+      flagInactive = true; // flag for inactive
     }
-  } else if (timerCount == 0) {
+  }
+
+  else if (timerCount == 0)
+  {
     digitalWrite(Ledboard, LOW);
     delay(500);
     digitalWrite(Ledboard, HIGH);
     delay(500);
+    flagInactive = true;
   }
+
+  if (timerCountInactive == Int_inactiveP)
+  {
+    if (flagEx == false)
+    {
+      Serial.println("Inactive On");
+      digitalWrite(RelayCtlIn, HIGH);
+      digitalWrite(RelayCtlOut,LOW);
+      flagEx = true;
+    }
+  }
+  if (timerCountInactive == Int_inactiveP + Int_inactivePulseLenght)
+  {
+    if (flagEx == false)
+    {
+      Serial.println("Inactive OFF");
+      digitalWrite(RelayCtlIn, LOW);
+      digitalWrite(RelayCtlOut,LOW);
+      timerCountInactive =0;
+      flagEx = true;
+    }
+  }
+
+  
 }

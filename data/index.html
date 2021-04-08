@@ -24,6 +24,7 @@
         <p>Time now: <strong> %timeNow%</strong></p>
         <p>IP: <strong> %ipAdress%</strong></p>
         <p>Mac: <strong> %macAdress%</strong></p>
+        <p>Time count : <strong>%timeCount%</strong></p>
         <p>Reset count : <strong> %resetCount%</strong></p>
 
 
@@ -51,6 +52,15 @@
             Pulse long pump for every second: %2ndPSpulseLenght% <input type="number" name="2ndPSpulseLenght">
             <input type="submit" value="Submit" onclick=" submitMessage()">
         </form><br>
+        <form action="/get" target=hidden-form>
+            Inactive pump delay: %inactiveP% <input type="number" name="inactiveP">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+        <form action="/get" target=hidden-form>
+            Inactive pump pulse lenght: %inactivePulseLenght% <input type="number" name="inactivePulseLenght">
+            <input type="submit" value="Submit" onclick=" submitMessage()">
+        </form><br>
+
 
 
         <form action="/get" target="hidden-form">
