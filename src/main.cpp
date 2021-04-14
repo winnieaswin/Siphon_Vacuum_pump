@@ -709,6 +709,7 @@ void loop()
       Serial.print("High_topic :");
       Serial.println(C_topic_Hostname);
       digitalWrite(RelayCtlOut, HIGH);
+      digitalWrite(RelayCtlIn, LOW);
       digitalWrite(Ledboard, HIGH);
       flagEx = true;
     }
@@ -719,6 +720,7 @@ void loop()
     {
       Serial.println("Stop Relay");
       digitalWrite(RelayCtlOut, LOW);
+      digitalWrite(RelayCtlIn, LOW);
       digitalWrite(Ledboard, LOW);
       flagEx = true;
     }
