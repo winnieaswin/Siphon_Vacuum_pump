@@ -90,16 +90,14 @@ const char *PARAM_2ndPSpulseLenght = "2ndPSpulseLenght";
 const char *PARAM_inactiveP = "inactiveP";
 const char *PARAM_inactivePulseLenght = "inactivePulseLenght";
 
-
-
 // var delay pump
 int Int_waitToActive;
 int Int_pulseToPump;
 int Int_waitToStop;
 int Int_pulseToStop;
-int Int_2ndPSt;           // delay to active again pump
-int Int_2ndPSpulseLenght; // pulse lengnt for second pump
-int Int_inactiveP; // inactive pump
+int Int_2ndPSt;              // delay to active again pump
+int Int_2ndPSpulseLenght;    // pulse lengnt for second pump
+int Int_inactiveP;           // inactive pump
 int Int_inactivePulseLenght; //pulse lenght inactive pump
 
 int Int_WtaPtp = 0; // sum Int_waitToActive + Int_pulseToPump
@@ -116,9 +114,9 @@ String S_macAdress;
 String S_idHostname;
 String S_waitToStop;
 String S_pulseToStop;
-String S_2ndPSt;           // delay to active again pump
-String S_2ndPSpulseLenght; // pulse lengnt for second pump
-String S_inactiveP; // inactive pump
+String S_2ndPSt;              // delay to active again pump
+String S_2ndPSpulseLenght;    // pulse lengnt for second pump
+String S_inactiveP;           // inactive pump
 String S_inactivePulseLenght; // inactive pulse lenght
 
 // Create AsyncWebServer object on port 80
@@ -230,7 +228,11 @@ String processor(const String &var)
   }
   else if (var == "timeCount")
   {
-    return readFile(SPIFFS, "/timeCount.txt");
+    return String(timerCount);
+  }
+  else if (var == "timerCountInactive")
+  {
+    return String(timerCountInactive);
   }
   else if (var == "resetCount")
   {
@@ -306,9 +308,8 @@ void init_server() // Server init
     Serial.println("file open failed");
   }
   // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/index.html", String(), false, processor);
-  });
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send(SPIFFS, "/index.html", String(), false, processor); });
 
   // Read waitToActive :
   S_waitToActive = readFile(SPIFFS, "/waitToActive.txt");
@@ -334,11 +335,11 @@ void init_server() // Server init
   S_2ndPSpulseLenght = readFile(SPIFFS, "/2ndPSpulseLenght.txt");
   Int_2ndPSpulseLenght = S_2ndPSpulseLenght.toInt();
 
-  // Read inactive pump 
+  // Read inactive pump
   S_inactiveP = readFile(SPIFFS, "/inactiveP.txt");
   Int_inactiveP = S_inactiveP.toInt();
 
-  // Read inactive pump lenght 
+  // Read inactive pump lenght
   S_inactivePulseLenght = readFile(SPIFFS, "/inactivePulseLenght.txt");
   Int_inactivePulseLenght = S_inactivePulseLenght.toInt();
 
@@ -348,93 +349,99 @@ void init_server() // Server init
   // //Read Reset Count
   // S_ResetCount = readFile(SPIFFS, "/resetCount.txt");
 
-  server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
-    writeFile(SPIFFS, "/resetCount.txt", "0");
-    delay(10);
-    ESP.restart();
-  });
+  server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              writeFile(SPIFFS, "/resetCount.txt", "0");
+              delay(10);
+              ESP.restart();
+            });
 
-  server.on("/AirOutOn", HTTP_GET, [](AsyncWebServerRequest *request) {
-    digitalWrite(RelayCtlOut, HIGH);
-    Serial.println("Relay Air Out on");
-    delay(1000);
-    request->redirect("/");
-  });
-  server.on("/AirOutOff", HTTP_GET, [](AsyncWebServerRequest *request) {
-    digitalWrite(RelayCtlOut, LOW);
-    Serial.println("Relay Air Out off");
-    delay(1000);
-    request->redirect("/");
-  });
-  server.on("/AirInOn", HTTP_GET, [](AsyncWebServerRequest *request) {
-    digitalWrite(RelayCtlIn, HIGH);
-    Serial.println("Relay Air In on");
-    delay(1000);
-    request->redirect("/");
-  });
-  server.on("/AirInOff", HTTP_GET, [](AsyncWebServerRequest *request) {
-    digitalWrite(RelayCtlIn, LOW);
-    Serial.println("Relay Air In off");
-    delay(1000);
-    request->redirect("/");
-  });
+  server.on("/AirOutOn", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              digitalWrite(RelayCtlOut, HIGH);
+              Serial.println("Relay Air Out on");
+              delay(1000);
+              request->redirect("/");
+            });
+  server.on("/AirOutOff", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              digitalWrite(RelayCtlOut, LOW);
+              Serial.println("Relay Air Out off");
+              delay(1000);
+              request->redirect("/");
+            });
+  server.on("/AirInOn", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              digitalWrite(RelayCtlIn, HIGH);
+              Serial.println("Relay Air In on");
+              delay(1000);
+              request->redirect("/");
+            });
+  server.on("/AirInOff", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              digitalWrite(RelayCtlIn, LOW);
+              Serial.println("Relay Air In off");
+              delay(1000);
+              request->redirect("/");
+            });
 
   // Send a GET request to <ESP_IP>/get?input1=<inputMessage>
-  server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String inputMessage;
-    // String inputParam; //no used
-    // GET timeBetween value on <ESP_IP>/get?timeBetween=<inputMessage>
-    if (request->hasParam(PARAM_waitToActive))
-    {
-      inputMessage = request->getParam(PARAM_waitToActive)->value();
-      writeFile(SPIFFS, "/waitToActive.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_pulseToPump))
-    {
-      inputMessage = request->getParam(PARAM_pulseToPump)->value();
-      writeFile(SPIFFS, "/pulseToPump.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_idHostname))
-    {
-      inputMessage = request->getParam(PARAM_idHostname)->value();
-      writeFile(SPIFFS, "/idHostname.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_waitToStop))
-    {
-      inputMessage = request->getParam(PARAM_waitToStop)->value();
-      writeFile(SPIFFS, "/waitToStop.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_pulseToStop))
-    {
-      inputMessage = request->getParam(PARAM_pulseToStop)->value();
-      writeFile(SPIFFS, "/pulseToStop.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_2ndPSt))
-    {
-      inputMessage = request->getParam(PARAM_2ndPSt)->value();
-      writeFile(SPIFFS, "/2ndPSt.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_2ndPSpulseLenght))
-    {
-      inputMessage = request->getParam(PARAM_2ndPSpulseLenght)->value();
-      writeFile(SPIFFS, "/2ndPSpulseLenght.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_inactiveP))
-    {
-      inputMessage = request->getParam(PARAM_inactiveP)->value();
-      writeFile(SPIFFS, "/inactiveP.txt", inputMessage.c_str());
-    }
-    else if (request->hasParam(PARAM_inactivePulseLenght))
-    {
-      inputMessage = request->getParam(PARAM_inactivePulseLenght)->value();
-      writeFile(SPIFFS, "/inactivePulseLenght.txt", inputMessage.c_str());
-    }
-    else
-    {
-      inputMessage = "No message sent";
-    }
-    request->send(200, "text/text", inputMessage);
-  });
+  server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              String inputMessage;
+              // String inputParam; //no used
+              // GET timeBetween value on <ESP_IP>/get?timeBetween=<inputMessage>
+              if (request->hasParam(PARAM_waitToActive))
+              {
+                inputMessage = request->getParam(PARAM_waitToActive)->value();
+                writeFile(SPIFFS, "/waitToActive.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_pulseToPump))
+              {
+                inputMessage = request->getParam(PARAM_pulseToPump)->value();
+                writeFile(SPIFFS, "/pulseToPump.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_idHostname))
+              {
+                inputMessage = request->getParam(PARAM_idHostname)->value();
+                writeFile(SPIFFS, "/idHostname.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_waitToStop))
+              {
+                inputMessage = request->getParam(PARAM_waitToStop)->value();
+                writeFile(SPIFFS, "/waitToStop.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_pulseToStop))
+              {
+                inputMessage = request->getParam(PARAM_pulseToStop)->value();
+                writeFile(SPIFFS, "/pulseToStop.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_2ndPSt))
+              {
+                inputMessage = request->getParam(PARAM_2ndPSt)->value();
+                writeFile(SPIFFS, "/2ndPSt.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_2ndPSpulseLenght))
+              {
+                inputMessage = request->getParam(PARAM_2ndPSpulseLenght)->value();
+                writeFile(SPIFFS, "/2ndPSpulseLenght.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_inactiveP))
+              {
+                inputMessage = request->getParam(PARAM_inactiveP)->value();
+                writeFile(SPIFFS, "/inactiveP.txt", inputMessage.c_str());
+              }
+              else if (request->hasParam(PARAM_inactivePulseLenght))
+              {
+                inputMessage = request->getParam(PARAM_inactivePulseLenght)->value();
+                writeFile(SPIFFS, "/inactivePulseLenght.txt", inputMessage.c_str());
+              }
+              else
+              {
+                inputMessage = "No message sent";
+              }
+              request->send(200, "text/text", inputMessage);
+            });
   server.begin();
 } // end Server init
 
@@ -505,34 +512,36 @@ void reconnect() // reconnect mqtt server
 void init_OTA()
 {
   ArduinoOTA
-      .onStart([]() {
-        String type;
-        if (ArduinoOTA.getCommand() == U_FLASH)
-          type = "sketch";
-        else // U_SPIFFS
-          type = "filesystem";
+      .onStart([]()
+               {
+                 String type;
+                 if (ArduinoOTA.getCommand() == U_FLASH)
+                   type = "sketch";
+                 else // U_SPIFFS
+                   type = "filesystem";
 
-        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS
-        // using SPIFFS.end()
-        Serial.println("Start updating " + type);
-      })
-      .onEnd([]() { Serial.println("\nEnd"); })
-      .onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-      })
-      .onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR)
-          Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR)
-          Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR)
-          Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR)
-          Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR)
-          Serial.println("End Failed");
-      });
+                 // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS
+                 // using SPIFFS.end()
+                 Serial.println("Start updating " + type);
+               })
+      .onEnd([]()
+             { Serial.println("\nEnd"); })
+      .onProgress([](unsigned int progress, unsigned int total)
+                  { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); })
+      .onError([](ota_error_t error)
+               {
+                 Serial.printf("Error[%u]: ", error);
+                 if (error == OTA_AUTH_ERROR)
+                   Serial.println("Auth Failed");
+                 else if (error == OTA_BEGIN_ERROR)
+                   Serial.println("Begin Failed");
+                 else if (error == OTA_CONNECT_ERROR)
+                   Serial.println("Connect Failed");
+                 else if (error == OTA_RECEIVE_ERROR)
+                   Serial.println("Receive Failed");
+                 else if (error == OTA_END_ERROR)
+                   Serial.println("End Failed");
+               });
 
   ArduinoOTA.begin();
 }
@@ -679,7 +688,7 @@ void loop()
     if (flagLvl) // active by lvl sensor
     {
       timerCount++;
-      writeFile(SPIFFS, "/timeCount.txt", itoa(timerCount, C_timeCount, 10));
+      //writeFile(SPIFFS, "/timeCount.txt", itoa(timerCount, C_timeCount, 10));
       flagEx = false;
       Serial.print("timerCount_b: ");
       Serial.println(timerCount);
@@ -744,7 +753,20 @@ void loop()
       Serial.println("Stop Relay second time");
       digitalWrite(RelayCtlOut, LOW);
       digitalWrite(Ledboard, LOW);
-      Int_2ndPSt = Int_2ndPSt + S_2ndPSt.toInt();
+
+      if (digitalRead(LevelSensorPIN) == LOW)
+      {
+        Serial.println("Still have water");
+        timerCount = (timerCount -Int_2ndPSt - 1);
+        //put value back for start second vacuum and -1 sec
+      }
+      else
+      {
+        Int_2ndPSt = Int_2ndPSt + S_2ndPSt.toInt();
+      }
+      
+      //recheck if water is still present
+
       flagEx = true;
     }
   }
@@ -755,7 +777,7 @@ void loop()
     {
       Serial.println("Air In");
       digitalWrite(RelayCtlIn, HIGH);
-      digitalWrite(RelayCtlOut,LOW);
+      digitalWrite(RelayCtlOut, LOW);
       flagEx = true;
     }
   }
@@ -764,7 +786,7 @@ void loop()
     if (flagEx == false)
     {
       digitalWrite(RelayCtlIn, LOW);
-      digitalWrite(RelayCtlOut,LOW);
+      digitalWrite(RelayCtlOut, LOW);
       time(&now);
       localtime_r(&now, &timeinfo);
       strftime(strftime_buf, sizeof(strftime_buf), "%F_%H_%M_%S", &timeinfo);
@@ -799,7 +821,7 @@ void loop()
     {
       Serial.println("Inactive On");
       digitalWrite(RelayCtlIn, HIGH);
-      digitalWrite(RelayCtlOut,LOW);
+      digitalWrite(RelayCtlOut, LOW);
       flagEx = true;
     }
   }
@@ -809,11 +831,9 @@ void loop()
     {
       Serial.println("Inactive OFF");
       digitalWrite(RelayCtlIn, LOW);
-      digitalWrite(RelayCtlOut,LOW);
-      timerCountInactive =0;
+      digitalWrite(RelayCtlOut, LOW);
+      timerCountInactive = 0;
       flagEx = true;
     }
   }
-
-  
 }
