@@ -54,7 +54,6 @@ char C_ip_adress[14] = "IP adress"; // for Mqtt ID
 char C_mac_adr[18];                 // for Mqtt ID
 char C_idHostname[40];
 char C_topic_Hostname[40] = "esp32/";
-char C_timeCount[8];
 int LevelSensorPIN = 15;
 int Ledboard = 2;
 int RelayCtlIn = 14;
@@ -84,7 +83,6 @@ const char *PARAM_idHostname = "idHostname";
 const char *PARAM_waitToStop = "waitToStop";
 const char *PARAM_pulseToStop = "pulseToStop";
 const char *PARAM_resetCount = "resetCount";
-const char *PARAM_timeCount = "timeCount";
 const char *PARAM_2ndPSt = "2ndPSt";
 const char *PARAM_2ndPSpulseLenght = "2ndPSpulseLenght";
 const char *PARAM_inactiveP = "inactiveP";
@@ -226,7 +224,7 @@ String processor(const String &var)
   {
     return String(WiFi.macAddress());
   }
-  else if (var == "timeCount")
+  else if (var == "timerCount")
   {
     return String(timerCount);
   }
@@ -656,7 +654,7 @@ void loop()
     timer1s = 0;
     checkConnection();
   }
-  if (!client.connected())
+    if (!client.connected())
   {
     reconnect();
   }
@@ -688,7 +686,6 @@ void loop()
     if (flagLvl) // active by lvl sensor
     {
       timerCount++;
-      //writeFile(SPIFFS, "/timeCount.txt", itoa(timerCount, C_timeCount, 10));
       flagEx = false;
       Serial.print("timerCount_b: ");
       Serial.println(timerCount);
@@ -757,14 +754,15 @@ void loop()
       if (digitalRead(LevelSensorPIN) == LOW)
       {
         Serial.println("Still have water");
-        timerCount = (timerCount -Int_2ndPSt - 1);
+        timerCount = (timerCount - Int_2ndPSt - 1);
+        // client.publish(C_topic_Hostname, c_relayBitH);
         //put value back for start second vacuum and -1 sec
       }
       else
       {
         Int_2ndPSt = Int_2ndPSt + S_2ndPSt.toInt();
       }
-      
+
       //recheck if water is still present
 
       flagEx = true;
