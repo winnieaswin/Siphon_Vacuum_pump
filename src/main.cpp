@@ -65,6 +65,7 @@ int y = 10; // variable for wifi reset
 // delay multiple
 #define uS_TO_S_FACTOR 1000000
 #define mS_TO_S 1000
+int maxInactive = 1000; //maximum count for inactive in case the counter is fail
 
 // my time
 // int day, hours, minutes, seconds, year, month, date, minuteSave;
@@ -647,6 +648,30 @@ void setup()
   init_OTA();
 }
 
+void liftUp()
+{
+    digitalWrite(RelayCtlOut, HIGH);
+    digitalWrite(RelayCtlIn, LOW);
+    digitalWrite(Ledboard, HIGH);
+    Serial.println("left Up");
+}
+
+void liftDown()
+{
+    digitalWrite(RelayCtlOut, LOW);
+    digitalWrite(RelayCtlIn, HIGH);
+    digitalWrite(Ledboard, HIGH);
+    Serial.println("left Down");
+}
+
+void liftStop()
+{
+    digitalWrite(RelayCtlOut, LOW);
+    digitalWrite(RelayCtlIn, LOW);
+    digitalWrite(Ledboard, LOW);
+    Serial.println("left Stop");
+}
+
 void loop()
 {
   if (timer1s > 0)
@@ -714,9 +739,7 @@ void loop()
       client.publish(C_topic_Hostname, c_relayBitH);
       Serial.print("High_topic :");
       Serial.println(C_topic_Hostname);
-      digitalWrite(RelayCtlOut, HIGH);
-      digitalWrite(RelayCtlIn, LOW);
-      digitalWrite(Ledboard, HIGH);
+      liftUp();
       flagEx = true;
     }
   }
@@ -725,9 +748,7 @@ void loop()
     if (flagEx == false)
     {
       Serial.println("Stop Relay");
-      digitalWrite(RelayCtlOut, LOW);
-      digitalWrite(RelayCtlIn, LOW);
-      digitalWrite(Ledboard, LOW);
+      liftStop();
       flagEx = true;
     }
   }
@@ -737,8 +758,9 @@ void loop()
     if (flagEx == false)
     {
       Serial.println("Start Relay second time");
-      digitalWrite(RelayCtlOut, HIGH);
-      digitalWrite(Ledboard, HIGH);
+      // for siphon 
+      // digitalWrite(RelayCtlOut, HIGH);
+      // digitalWrite(Ledboard, HIGH);
       flagEx = true;
     }
   }
@@ -748,14 +770,15 @@ void loop()
     if (flagEx == false)
     {
       Serial.println("Stop Relay second time");
-      digitalWrite(RelayCtlOut, LOW);
-      digitalWrite(Ledboard, LOW);
+      // for siphon 
+      // digitalWrite(RelayCtlOut, LOW);
+      // digitalWrite(Ledboard, LOW);
 
       if (digitalRead(LevelSensorPIN) == LOW)
       {
         Serial.println("Still have water");
         timerCount = (timerCount - Int_2ndPSt - 1);
-        // client.publish(C_topic_Hostname, c_relayBitH);
+        client.publish(C_topic_Hostname, c_relayBitH);
         //put value back for start second vacuum and -1 sec
       }
       else
@@ -773,9 +796,7 @@ void loop()
   {
     if (flagEx == false)
     {
-      Serial.println("Air In");
-      digitalWrite(RelayCtlIn, HIGH);
-      digitalWrite(RelayCtlOut, LOW);
+      liftDown();
       flagEx = true;
     }
   }
@@ -783,8 +804,7 @@ void loop()
   {
     if (flagEx == false)
     {
-      digitalWrite(RelayCtlIn, LOW);
-      digitalWrite(RelayCtlOut, LOW);
+      liftStop();
       time(&now);
       localtime_r(&now, &timeinfo);
       strftime(strftime_buf, sizeof(strftime_buf), "%F_%H_%M_%S", &timeinfo);
@@ -818,8 +838,9 @@ void loop()
     if (flagEx == false)
     {
       Serial.println("Inactive On");
-      digitalWrite(RelayCtlIn, HIGH);
-      digitalWrite(RelayCtlOut, LOW);
+      liftUp();
+      // digitalWrite(RelayCtlIn, HIGH);
+      // digitalWrite(RelayCtlOut, LOW);
       flagEx = true;
     }
   }
@@ -828,10 +849,36 @@ void loop()
     if (flagEx == false)
     {
       Serial.println("Inactive OFF");
-      digitalWrite(RelayCtlIn, LOW);
-      digitalWrite(RelayCtlOut, LOW);
+      liftDown();
+      // digitalWrite(RelayCtlIn, LOW);
+      // digitalWrite(RelayCtlOut, LOW);
+      // timerCountInactive = 0;
+      flagEx = true;
+    }
+  }
+  if (timerCountInactive == Int_inactiveP + Int_inactivePulseLenght+Int_pulseToPump)
+  {
+    if (flagEx == false)
+    {
+      Serial.println("Inactive OFF");
+      liftStop();
+      // digitalWrite(RelayCtlIn, LOW);
+      // digitalWrite(RelayCtlOut, LOW);
+      timerCountInactive = 0;
+      flagEx = true;
+    }
+  if (timerCountInactive >= maxInactive)
+  {
+    if (flagEx == false)
+    {
+      Serial.println("reset Inactive counter");
+      liftStop();
+      // digitalWrite(RelayCtlIn, LOW);
+      // digitalWrite(RelayCtlOut, LOW);
       timerCountInactive = 0;
       flagEx = true;
     }
   }
+  }
+
 }
